@@ -1,9 +1,14 @@
 <!DOCTYPE html>
-<html lang="bn">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ভয়েস স্টুডিও</title>
+<title>Voice Studio</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1f4e8c">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js"></script>
 <style>
@@ -33,47 +38,47 @@ details summary{cursor:pointer;color:var(--mut);font-size:14px}
 </style>
 </head>
 <body>
-<h1>ভয়েস স্টুডিও</h1>
-<p class="sub">নমুনা ভয়েস দিন, স্ক্রিপ্ট লিখুন, mp3 নামান।</p>
+<h1>Voice Studio</h1>
+<p class="sub">Add a voice sample, write a script, download the mp3.</p>
 
 <section>
-<h2>১. ভয়েস নমুনা</h2>
+<h2>1. Voice sample</h2>
 <input type="file" id="file" accept="audio/*">
 <div class="row">
-<button class="rec" id="recBtn">রেকর্ড শুরু</button>
-<span id="recInfo" style="color:var(--mut);font-size:14px">১০–৩০ সেকেন্ডের পরিষ্কার ভয়েস সবচেয়ে ভালো কাজ করে</span>
+<button class="rec" id="recBtn">Start recording</button>
+<span id="recInfo" style="color:var(--mut);font-size:14px">A clean 5–15 second clip works best</span>
 </div>
 <audio id="samplePlayer" controls hidden></audio>
 </section>
 
 <section>
-<h2>২. স্ক্রিপ্ট</h2>
-<textarea id="script" placeholder="এখানে স্ক্রিপ্ট লিখুন"></textarea>
-<label for="lang">ভাষা</label>
+<h2>2. Script</h2>
+<textarea id="script" placeholder="Type your script here (Bengali or English)"></textarea>
+<label for="lang">Language</label>
 <select id="lang">
-<option value="bn">বাংলা</option><option value="en">English</option>
+<option value="bn">Bengali (বাংলা)</option><option value="en">English</option>
 </select>
-<details style="margin-top:10px"><summary>এডভান্সড: মডেল সেটিং</summary>
-<label for="space">Hugging Face Space (user/name) — বাংলা সাপোর্ট থাকতে হবে</label>
+<details style="margin-top:10px"><summary>Advanced: model settings</summary>
+<label for="space">Hugging Face Space (user/name), must support Bengali</label>
 <input type="text" id="space" value="kawshikbuet17/bengali-cosyvoice3-tts-demo">
-<label for="hf">HF Token (ঐচ্ছিক, লিমিট বাড়াতে)</label>
+<label for="hf">HF token (optional, raises usage limits)</label>
 <input type="text" id="hf" placeholder="hf_...">
 </details>
-<div class="row"><button id="gen">ভয়েস তৈরি করুন</button></div>
+<div class="row"><button id="gen">Generate voice</button></div>
 <div id="st"></div>
 </section>
 
 <section>
-<h2>৩. এনহ্যান্স ও ইফেক্ট</h2>
-<div class="sl"><span>নয়েজ কমানো</span><input type="range" id="nr" min="0" max="100" value="50"><output></output></div>
-<div class="sl"><span>স্পষ্টতা</span><input type="range" id="clar" min="0" max="100" value="40"><output></output></div>
-<div class="sl"><span>বেস</span><input type="range" id="bass" min="0" max="100" value="20"><output></output></div>
-<div class="sl"><span>রিভার্ব</span><input type="range" id="rev" min="0" max="100" value="0"><output></output></div>
-<div class="sl"><span>ইকো</span><input type="range" id="echo" min="0" max="100" value="0"><output></output></div>
-<div class="sl"><span>স্পিড</span><input type="range" id="speed" min="70" max="140" value="100"><output></output></div>
-<div class="row"><button class="alt" id="apply" disabled>প্রয়োগ করে শুনুন</button></div>
+<h2>3. Enhance and effects</h2>
+<div class="sl"><span>Noise reduction</span><input type="range" id="nr" min="0" max="100" value="50"><output></output></div>
+<div class="sl"><span>Clarity</span><input type="range" id="clar" min="0" max="100" value="40"><output></output></div>
+<div class="sl"><span>Bass</span><input type="range" id="bass" min="0" max="100" value="20"><output></output></div>
+<div class="sl"><span>Reverb</span><input type="range" id="rev" min="0" max="100" value="0"><output></output></div>
+<div class="sl"><span>Echo</span><input type="range" id="echo" min="0" max="100" value="0"><output></output></div>
+<div class="sl"><span>Speed</span><input type="range" id="speed" min="70" max="140" value="100"><output></output></div>
+<div class="row"><button class="alt" id="apply" disabled>Apply and preview</button></div>
 <audio id="player" controls hidden></audio>
-<div class="row"><button id="dl" disabled>mp3 ডাউনলোড</button></div>
+<div class="row"><button id="dl" disabled>Download mp3</button></div>
 </section>
 
 <script type="module">
@@ -104,9 +109,9 @@ $("recBtn").onclick = async () => {
     const s = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
     mr = new MediaRecorder(s); chunks = [];
     mr.ondataavailable = e => chunks.push(e.data);
-    mr.onstop = () => { s.getTracks().forEach(t => t.stop()); setSample(new Blob(chunks, { type: mr.mimeType })); $("recBtn").textContent = "আবার রেকর্ড"; };
-    mr.start(); $("recBtn").textContent = "থামান";
-  } catch (e) { st("মাইক্রোফোনের অনুমতি দিন।", true); }
+    mr.onstop = () => { s.getTracks().forEach(t => t.stop()); setSample(new Blob(chunks, { type: mr.mimeType })); $("recBtn").textContent = "Record again"; };
+    mr.start(); $("recBtn").textContent = "Stop";
+  } catch (e) { st("Allow microphone access to record.", true); }
 };
 
 // ---- ক্লোন (Hugging Face Space) ----
@@ -152,32 +157,32 @@ function buildArgs(params, text) {
 
 $("gen").onclick = async () => {
   const text = $("script").value.trim();
-  if (!sampleBlob) return st("আগে ভয়েস নমুনা দিন।", true);
-  if (!text) return st("স্ক্রিপ্ট লিখুন।", true);
+  if (!sampleBlob) return st("Add a voice sample first.", true);
+  if (!text) return st("Write a script first.", true);
   $("gen").disabled = true;
   try {
-    st("মডেলের সাথে সংযোগ হচ্ছে…");
+    st("Connecting to the model…");
     const tok = $("hf").value.trim();
     const client = await Client.connect($("space").value.trim(), tok ? { hf_token: tok } : {});
-    st("ভয়েস তৈরি হচ্ছে… (ফ্রি সার্ভারে কিছুক্ষণ লাগতে পারে)");
+    st("Generating voice… (free servers can take a while)");
     // Space-এর API নিজে পড়ে ইনপুট মিলিয়ে নেয়
     const info = await client.view_api();
     const eps = info.named_endpoints || {};
     let name = Object.keys(eps).find(k => (eps[k].parameters || []).some(p => /audio|file/i.test(p.component || "")));
     if (!name) name = Object.keys(eps)[0];
-    if (!name) throw new Error("Space-এ কোনো API এন্ডপয়েন্ট পাওয়া যায়নি");
+    if (!name) throw new Error("No API endpoint found in this Space");
     const args = buildArgs(eps[name].parameters || [], text);
     const res = await client.predict(name, args);
     const url = findAudio(res.data);
-    if (!url) throw new Error("আউটপুটে অডিও পাওয়া যায়নি");
+    if (!url) throw new Error("No audio found in the output");
     const buf = await (await fetch(url)).arrayBuffer();
     rawBuf = await AC.decodeAudioData(buf);
     $("apply").disabled = false;
-    st("তৈরি হয়েছে। ইফেক্ট দিয়ে শুনুন।");
+    st("Done. Adjust the effects and preview.");
     await process();
   } catch (e) {
     console.error(e);
-    st("ত্রুটি: " + (e.message || e) + " — Space ব্যস্ত বা লিমিট শেষ হতে পারে, একটু পরে আবার চেষ্টা করুন।", true);
+    st("Error: " + (e.message || e) + " — the Space may be busy or out of quota. Try again in a minute.", true);
   }
   $("gen").disabled = false;
 };
@@ -293,6 +298,8 @@ $("dl").onclick = () => {
   a.href = URL.createObjectURL(new Blob(parts, { type: "audio/mpeg" }));
   a.download = "voice.mp3"; a.click();
 };
+
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 </script>
 </body>
 </html>
