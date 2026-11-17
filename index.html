@@ -58,18 +58,17 @@ details summary{cursor:pointer;color:var(--mut);font-size:14px}
 <select id="lang">
 <option value="bn">Bengali (বাংলা)</option><option value="en">English</option>
 </select>
-<details style="margin-top:10px"><summary>Advanced: model settings</summary>
-<label for="space">Hugging Face Space (user/name), must support Bengali</label>
-<input type="text" id="space" value="kawshikbuet17/bengali-cosyvoice3-tts-demo">
-<label for="hf">HF token (optional, raises usage limits)</label>
-<input type="text" id="hf" placeholder="hf_...">
-</details>
+<label for="srv">Colab server link (printed by the notebook)</label>
+<input type="text" id="srv" placeholder="https://xxxx.trycloudflare.com" autocapitalize="off" autocorrect="off">
 <div class="row"><button id="gen">Generate voice</button></div>
 <div id="st"></div>
+<p style="font-size:14px;color:var(--mut);margin:8px 0 0">No link yet? Open the Colab notebook, run its two cells, and paste the link it prints. The link changes each time you restart it.</p>
 </section>
 
 <section>
 <h2>3. Enhance and effects</h2>
+<label for="imp">Already have generated audio? Load it here to enhance it and export mp3</label>
+<input type="file" id="imp" accept="audio/*">
 <div class="sl"><span>Noise reduction</span><input type="range" id="nr" min="0" max="100" value="50"><output></output></div>
 <div class="sl"><span>Clarity</span><input type="range" id="clar" min="0" max="100" value="40"><output></output></div>
 <div class="sl"><span>Bass</span><input type="range" id="bass" min="0" max="100" value="20"><output></output></div>
@@ -82,7 +81,6 @@ details summary{cursor:pointer;color:var(--mut);font-size:14px}
 </section>
 
 <script type="module">
-import { Client, handle_file } from "https://cdn.jsdelivr.net/npm/@gradio/client@1.8.0/+esm";
 
 const $ = id => document.getElementById(id);
 const st = (m, e) => { $("st").textContent = m; $("st").className = e ? "err" : ""; };
@@ -114,99 +112,42 @@ $("recBtn").onclick = async () => {
   } catch (e) { st("Allow microphone access to record.", true); }
 };
 
-// ---- ক্লোন (Hugging Face Space) ----
-function findAudio(data) {
-  const urls = [];
-  const walk = v => {
-    if (!v) return;
-    if (typeof v === "object") {
-      if (typeof v.url === "string") urls.push(v.url);
-      else if (Array.isArray(v)) v.forEach(walk);
-      else Object.values(v).forEach(walk);
-    }
-  };
-  walk(data);
-  return urls.find(u => /\.(wav|mp3|ogg|flac|m4a)(\?|$)/i.test(u)) || urls[urls.length - 1];
-}
-
-
-function buildArgs(params, text) {
-  const lang = $("lang").value;
-  let gotText = false, gotAudio = false;
-  return params.map(p => {
-    const comp = (p.component || "").toLowerCase();
-    const label = ((p.label || "") + " " + (p.parameter_name || "")).toLowerCase();
-    const dflt = p.parameter_has_default ? p.parameter_default : (p.example_input ?? null);
-    if (/audio|file/.test(comp)) {
-      if (!gotAudio) { gotAudio = true; return handle_file(sampleBlob); }
-      return dflt;
-    }
-    if (/lang/.test(label)) {
-      const ch = [...((p.python_type && p.python_type.description) || "").matchAll(/'([^']+)'/g)].map(m => m[1]);
-      const want = lang === "bn" ? /^(bn|ben|bangla|bengali)/i : /^(en|eng)/i;
-      return ch.find(c => want.test(c)) || (typeof dflt === "string" ? dflt : lang);
-    }
-    if (/textbox|textarea/.test(comp) || (p.type && p.type.type === "string" && !/dropdown|radio/.test(comp))) {
-      if (/prefix|instruction|(prompt|ref|transcript|reference).*(text|transcript)|prompt_text|ref_text/.test(label)) return dflt ?? "";
-      if (!gotText) { gotText = true; return text; }
-      return dflt ?? "";
-    }
-    return dflt;
-  });
-}
+// ---- ক্লোন (Colab server) ----
+try { $("srv").value = localStorage.getItem("voicestudio-server") || ""; } catch (e) {}
 
 $("gen").onclick = async () => {
   const text = $("script").value.trim();
+  const srv = $("srv").value.trim().replace(/\/+$/, "");
   if (!sampleBlob) return st("Add a voice sample first.", true);
   if (!text) return st("Write a script first.", true);
+  if (!/^https:\/\//.test(srv)) return st("Paste the server link from the Colab notebook first.", true);
+  try { localStorage.setItem("voicestudio-server", srv); } catch (e) {}
   $("gen").disabled = true;
-  let step = "status check";
+  let step = "connect";
   try {
-    const id = $("space").value.trim();
-    const tok = $("hf").value.trim();
-    st("Checking the Space…");
-    try {
-      const r = await fetch("https://huggingface.co/api/spaces/" + id, tok ? { headers: { Authorization: "Bearer " + tok } } : {});
-      if (r.status === 404) throw new Error("Space “" + id + "” was not found. Check the name in Advanced settings.");
-      if (r.ok) {
-        const j = await r.json(), stage = j.runtime && j.runtime.stage;
-        if (stage && stage !== "RUNNING") throw new Error("The Space is " + stage + ". Open https://huggingface.co/spaces/" + id + " once, wait until it loads, then try again.");
-      }
-    } catch (e) { if (!/Failed to fetch/.test(String(e))) throw e; }
-
-    step = "connect";
-    st("Connecting to the model…");
-    const client = await Client.connect(id, tok ? { hf_token: tok } : {});
-
-    step = "read API";
-    st("Reading the Space API…");
-    const info = await client.view_api();
-    const eps = info.named_endpoints || {};
-    let name = Object.keys(eps).find(k => (eps[k].parameters || []).some(p => /audio|file/i.test(p.component || "")));
-    if (!name) name = Object.keys(eps)[0];
-    if (!name) throw new Error("No API endpoint found in this Space. It may not expose a Gradio API.");
-    const args = buildArgs(eps[name].parameters || [], text);
+    st("Connecting to your Colab server…");
+    const ping = await fetch(srv + "/ping");
+    if (!ping.ok) throw new Error("Server answered with status " + ping.status);
 
     step = "generate";
-    st("Generating voice… (free servers can take a while)");
-    const res = await client.predict(name, args);
-    const url = findAudio(res.data);
-    if (!url) throw new Error("No audio found in the output");
+    st("Generating voice… (can take a minute on the free GPU)");
+    const fd = new FormData();
+    fd.append("text", text);
+    fd.append("lang", $("lang").value);
+    fd.append("audio", sampleBlob, "sample");
+    const r = await fetch(srv + "/clone", { method: "POST", body: fd });
+    if (!r.ok) throw new Error((await r.text()).slice(0, 200));
 
-    step = "download result";
-    const buf = await (await fetch(url)).arrayBuffer();
-    rawBuf = await AC.decodeAudioData(buf);
+    step = "decode";
+    rawBuf = await AC.decodeAudioData(await r.arrayBuffer());
     $("apply").disabled = false;
     st("Done. Adjust the effects and preview.");
     await process();
   } catch (e) {
     console.error(e);
     let m = e.message || String(e);
-    if (/Failed to fetch/.test(m)) {
-      m = step === "connect"
-        ? "Could not reach this Space from the browser (it may be asleep, or it does not allow browser access). Open it once in a tab, then retry. If it still fails, try another Space."
-        : "Network request failed at step: " + step + ". Check your connection and retry.";
-    }
+    if (/Failed to fetch|NetworkError|Load failed/.test(m))
+      m = "Cannot reach the Colab server. Check that notebook Cell 2 is still running and the link is the latest one.";
     st("Error (" + step + "): " + m, true);
   }
   $("gen").disabled = false;
@@ -294,6 +235,15 @@ async function process() {
   const p = $("player"); p.src = outUrl; p.hidden = false;
   $("dl").disabled = false;
 }
+$("imp").onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    rawBuf = await AC.decodeAudioData(await f.arrayBuffer());
+    $("apply").disabled = false;
+    st("Audio loaded. Adjust the effects and preview.");
+    await process();
+  } catch (err) { st("Could not read that audio file.", true); }
+};
 $("apply").onclick = async () => { $("apply").disabled = true; await process(); $("apply").disabled = false; };
 
 function toWav(b) {
