@@ -46,7 +46,7 @@ details summary{cursor:pointer;color:var(--mut);font-size:14px}
 <input type="file" id="file" accept="audio/*">
 <div class="row">
 <button class="rec" id="recBtn">Start recording</button>
-<span id="recInfo" style="color:var(--mut);font-size:14px">A clean 5–15 second clip works best</span>
+<span id="recInfo" style="color:var(--mut);font-size:14px">Keep the clip between 1 and 30 seconds; clean 5–15 s works best</span>
 </div>
 <audio id="samplePlayer" controls hidden></audio>
 </section>
@@ -147,7 +147,7 @@ function buildArgs(params, text) {
       return ch.find(c => want.test(c)) || (typeof dflt === "string" ? dflt : lang);
     }
     if (/textbox|textarea/.test(comp) || (p.type && p.type.type === "string" && !/dropdown|radio/.test(comp))) {
-      if (/(prompt|ref|transcript|reference).*(text|transcript)|prompt_text|ref_text/.test(label)) return dflt ?? "";
+      if (/prefix|instruction|(prompt|ref|transcript|reference).*(text|transcript)|prompt_text|ref_text/.test(label)) return dflt ?? "";
       if (!gotText) { gotText = true; return text; }
       return dflt ?? "";
     }
