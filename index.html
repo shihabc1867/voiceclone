@@ -160,21 +160,40 @@ $("gen").onclick = async () => {
   if (!sampleBlob) return st("Add a voice sample first.", true);
   if (!text) return st("Write a script first.", true);
   $("gen").disabled = true;
+  let step = "status check";
   try {
-    st("Connecting to the model…");
+    const id = $("space").value.trim();
     const tok = $("hf").value.trim();
-    const client = await Client.connect($("space").value.trim(), tok ? { hf_token: tok } : {});
-    st("Generating voice… (free servers can take a while)");
-    // Space-এর API নিজে পড়ে ইনপুট মিলিয়ে নেয়
+    st("Checking the Space…");
+    try {
+      const r = await fetch("https://huggingface.co/api/spaces/" + id, tok ? { headers: { Authorization: "Bearer " + tok } } : {});
+      if (r.status === 404) throw new Error("Space “" + id + "” was not found. Check the name in Advanced settings.");
+      if (r.ok) {
+        const j = await r.json(), stage = j.runtime && j.runtime.stage;
+        if (stage && stage !== "RUNNING") throw new Error("The Space is " + stage + ". Open https://huggingface.co/spaces/" + id + " once, wait until it loads, then try again.");
+      }
+    } catch (e) { if (!/Failed to fetch/.test(String(e))) throw e; }
+
+    step = "connect";
+    st("Connecting to the model…");
+    const client = await Client.connect(id, tok ? { hf_token: tok } : {});
+
+    step = "read API";
+    st("Reading the Space API…");
     const info = await client.view_api();
     const eps = info.named_endpoints || {};
     let name = Object.keys(eps).find(k => (eps[k].parameters || []).some(p => /audio|file/i.test(p.component || "")));
     if (!name) name = Object.keys(eps)[0];
-    if (!name) throw new Error("No API endpoint found in this Space");
+    if (!name) throw new Error("No API endpoint found in this Space. It may not expose a Gradio API.");
     const args = buildArgs(eps[name].parameters || [], text);
+
+    step = "generate";
+    st("Generating voice… (free servers can take a while)");
     const res = await client.predict(name, args);
     const url = findAudio(res.data);
     if (!url) throw new Error("No audio found in the output");
+
+    step = "download result";
     const buf = await (await fetch(url)).arrayBuffer();
     rawBuf = await AC.decodeAudioData(buf);
     $("apply").disabled = false;
@@ -182,7 +201,13 @@ $("gen").onclick = async () => {
     await process();
   } catch (e) {
     console.error(e);
-    st("Error: " + (e.message || e) + " — the Space may be busy or out of quota. Try again in a minute.", true);
+    let m = e.message || String(e);
+    if (/Failed to fetch/.test(m)) {
+      m = step === "connect"
+        ? "Could not reach this Space from the browser (it may be asleep, or it does not allow browser access). Open it once in a tab, then retry. If it still fails, try another Space."
+        : "Network request failed at step: " + step + ". Check your connection and retry.";
+    }
+    st("Error (" + step + "): " + m, true);
   }
   $("gen").disabled = false;
 };
