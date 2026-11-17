@@ -1,4 +1,4 @@
-const CACHE = "voice-studio-v2";
+const CACHE = "voice-studio-v3";
 const CORE = ["./", "index.html", "manifest.json", "icon-192.png", "icon-512.png"];
 const STATIC_HOSTS = ["cdnjs.cloudflare.com", "cdn.jsdelivr.net", "fonts.googleapis.com", "fonts.gstatic.com"];
 
